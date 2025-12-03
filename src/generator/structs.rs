@@ -48,6 +48,8 @@ fn generate_struct_from_schema(
         SchemaKind::Type(Type::Object(obj)) => {
             let fields = generate_struct_fields_from_object(name, obj, &schema.schema_data)?;
 
+            let derive_default = obj.required.is_empty().then(|| quote! { #[derive(Default)] });
+
             // Convert user attribute token streams to attributes
             let user_attrs = struct_attrs.iter().map(|tokens| {
                 quote! { #[#tokens] }
@@ -55,6 +57,7 @@ fn generate_struct_from_schema(
 
             Ok(quote! {
                 #doc_comment
+                #derive_default
                 #(#user_attrs)*
                 #[derive(Debug, Clone, Serialize, Deserialize)]
                 pub struct #struct_name {
@@ -63,7 +66,9 @@ fn generate_struct_from_schema(
             })
         }
         SchemaKind::Type(Type::String(string_schema)) if !string_schema.enumeration.is_empty() => {
-            let variants = generate_enum_variants_from_string(string_schema)?;
+            let (variants, can_default) = generate_enum_variants_from_string(string_schema, &schema.schema_data)?;
+
+            let derive_default = can_default.then(|| quote! { #[derive(Default)] });
 
             // Convert user attribute token streams to attributes
             let user_attrs = struct_attrs.iter().map(|tokens| {
@@ -73,6 +78,7 @@ fn generate_struct_from_schema(
             Ok(quote! {
                 #doc_comment
                 #(#user_attrs)*
+                #derive_default
                 #[derive(Debug, Clone, Serialize, Deserialize)]
                 pub enum #struct_name {
                     #variants
@@ -149,18 +155,26 @@ fn generate_struct_fields_from_object(
 }
 
 /// Generate enum variants from a string schema
-fn generate_enum_variants_from_string(string_schema: &StringType) -> Result<TokenStream2, String> {
+fn generate_enum_variants_from_string(string_schema: &StringType, schema_data: &SchemaData) -> Result<(TokenStream2, bool), String> {
     let mut variants = TokenStream2::new();
+    let mut can_default = false;
 
     for value in &string_schema.enumeration {
         if let Some(variant_str) = value.as_ref().and_then(|v| Some(v.as_str())) {
             let variant_name = format_ident!("{}", variant_str.to_pascal_case());
+            let default_variant = if schema_data.default == Some(serde_json::json!(variant_str)) {
+                can_default = true;
+                quote! { #[default] }
+            } else {
+                quote! {}
+            };
             variants.extend(quote! {
                 #[serde(rename = #variant_str)]
+                #default_variant
                 #variant_name,
             });
         }
     }
 
-    Ok(variants)
+    Ok((variants, can_default))
 }
