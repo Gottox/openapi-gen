@@ -134,6 +134,14 @@ fn generate_client(input: &OpenApiInput) -> Result<TokenStream2, String> {
     // Generate client documentation
     let client_doc = generate_client_doc_comment(&spec, &client_name.to_string());
 
+    let client_struct = input.gen_client.then(|| quote! {
+        #client_doc
+        #[derive(Clone)]
+        pub struct #client_name<C = reqwest::Client> {
+            base_url: String,
+            client: C,
+        }
+    });
     Ok(quote! {
         use serde::{Deserialize, Serialize};
         use std::collections::HashMap;
@@ -144,12 +152,7 @@ fn generate_client(input: &OpenApiInput) -> Result<TokenStream2, String> {
 
         #param_structs
 
-        #client_doc
-        #[derive(Clone)]
-        pub struct #client_name<C = reqwest::Client> {
-            base_url: String,
-            client: C,
-        }
+        #client_struct
 
         #client_impl
     })
