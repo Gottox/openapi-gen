@@ -58,7 +58,7 @@ use parser::*;
 /// or URL path.
 ///
 /// # Usage
-/// 
+///
 /// ```rust,ignore
 /// use openapi_gen::openapi_client;
 ///
@@ -79,9 +79,9 @@ use parser::*;
 ///     struct_attrs = (derive(PartialEq, Hash))
 /// );
 /// ```
-/// 
+///
 /// # Configuration Options
-/// 
+///
 /// - `use_param_structs` - Generate parameter structs for operations instead of individual parameters
 /// - `struct_attrs` - Add custom attributes to generated structs (in addition to default derives)
 #[proc_macro]
@@ -114,9 +114,15 @@ fn generate_client(input: &OpenApiInput) -> Result<TokenStream2, String> {
     };
 
     // Generate components
-    let structs = generate_structs(&spec, &input.struct_attrs)?;
-    let client_impl = generate_client_impl(&spec, &client_name, input.use_param_structs)?;
-    let error_types = generate_error_types();
+    let structs = input
+        .gen_struct
+        .then(|| generate_structs(&spec, &input.struct_attrs))
+        .transpose()?;
+    let client_impl = input
+        .gen_client
+        .then(|| generate_client_impl(&spec, &client_name, input.use_param_structs))
+        .transpose()?;
+    let error_types = input.gen_client.then(|| generate_error_types());
 
     // Generate parameter structs if requested
     let param_structs = if input.use_param_structs {

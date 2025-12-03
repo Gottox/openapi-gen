@@ -7,6 +7,8 @@ pub struct OpenApiInput {
     pub client_name: Option<String>,
     pub use_param_structs: bool,
     pub struct_attrs: Vec<TokenStream>,
+    pub gen_struct: bool,
+    pub gen_client: bool,
 }
 
 impl syn::parse::Parse for OpenApiInput {
@@ -18,6 +20,8 @@ impl syn::parse::Parse for OpenApiInput {
         let mut client_name = None;
         let mut use_param_structs = false;
         let mut struct_attrs = Vec::new();
+        let mut gen_struct = true;
+        let mut gen_client = true;
 
         // Parse remaining arguments
         while input.peek(Token![,]) {
@@ -34,6 +38,14 @@ impl syn::parse::Parse for OpenApiInput {
                 input.parse::<Token![=]>()?;
 
                 match key.to_string().as_str() {
+                    "gen_model" => {
+                        let value: LitBool = input.parse()?;
+                        gen_struct = value.value;
+                    }
+                    "gen_client" => {
+                        let value: LitBool = input.parse()?;
+                        gen_client = value.value;
+                    }
                     "use_param_structs" => {
                         let value: LitBool = input.parse()?;
                         use_param_structs = value.value;
@@ -98,6 +110,8 @@ impl syn::parse::Parse for OpenApiInput {
             client_name,
             use_param_structs,
             struct_attrs,
+            gen_struct,
+            gen_client,
         })
     }
 }
